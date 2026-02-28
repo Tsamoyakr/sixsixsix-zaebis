@@ -756,4 +756,34 @@ document.addEventListener('DOMContentLoaded', function() {
         tgChannel.className = 'tg-channel-block';
         tgChannel.innerHTML = `
             <div class="tg-channel-content">
-                <div class="tg-channel-title">📢 Н
+                <div class="tg-channel-title">📢 НОВОСТИ И ОБНОВЛЕНИЯ</div>
+                <div class="tg-channel-text">Все новости, обновления и анонсы публикуются в нашем Telegram-канале</div>
+                <a href="https://t.me/+0asI7j0d65Q2NDBi" target="_blank" class="tg-channel-button">🔥 ПОДПИСАТЬСЯ 🔥</a>
+            </div>
+        `;
+        suggestionsSection.insertBefore(tgChannel, suggestionsSection.firstChild);
+    }
+
+    // Добавляем описание комментариев
+    const commentsBlock = document.querySelector('.comments-block');
+    if (commentsBlock && !document.querySelector('.comments-info')) {
+        const commentsInfo = document.createElement('div');
+        commentsInfo.className = 'comments-info';
+        commentsInfo.innerHTML = '💡 Твой никнейм сохраняется автоматически по ID устройства. Лайки и дизлайки тоже запоминаются!';
+        commentsBlock.insertBefore(commentsInfo, commentsBlock.querySelector('.comment-list'));
+    }
+
+    // Инициализация
+    loadFromFirebase();
+    subscribeToUpdates();
+    renderTeacherWheel();
+    renderComments();
+    renderWinnersDistrict();
+    renderSchoolLeaders();
+    updateTimer();
+    setInterval(updateTimer, 60000);
+    
+    // Скрываем лишние секции
+    const suggestionsSectionElem = document.getElementById('suggestionsSection');
+    if (suggestionsSectionElem) suggestionsSectionElem.style.display = 'none';
+});
