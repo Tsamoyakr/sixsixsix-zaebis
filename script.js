@@ -78,6 +78,7 @@ let currentSchool = "33";
 let currentCategory = "sexy";
 let selectedTeacher = null;
 let filterSchool = "all";
+let currentNav = "main";
 
 // ID устройства
 let deviceId = localStorage.getItem('deviceId');
@@ -86,10 +87,37 @@ if (!deviceId) {
     localStorage.setItem('deviceId', deviceId);
 }
 
-// Данные (будут загружены из Firebase)
+// Данные
 let votes = { "33": {}, "13": {}, "29": {}, "raion": {} };
 let comments = { "33": [], "13": [], "29": [], "raion": [] };
 let commentLikes = {};
+
+// ===== СОЗДАЁМ СЕКЦИЮ "О ПРОЕКТЕ" =====
+function createAboutSection() {
+    const container = document.querySelector('.container');
+    if (!container) return;
+    
+    // Проверяем, есть ли уже секция
+    if (document.getElementById('aboutSection')) return;
+    
+    const aboutSection = document.createElement('div');
+    aboutSection.id = 'aboutSection';
+    aboutSection.className = 'about-section';
+    aboutSection.style.display = 'none';
+    aboutSection.innerHTML = `
+        <div class="about-content">
+            <h2>О ПРОЕКТЕ / МАНИФЕСТ</h2>
+            <p>Школа — это ад.<br>Душные уроки, крики по утрам и куча домашнего ада. Но есть в этом филиале преисподней те, кто делает это место чуть менее невыносимым. Или наоборот — превращают его в настоящий кошмар.</p>
+            <p>SixSixSix Zaebis — это народный рейтинг учителей, свободный от лицемерия и школьной цензуры.</p>
+            <p>Мы не собираем грамоты и не целуем руки. Мы собираем голоса. Здесь ученики решают, кто реально «Zaebis» (то есть заслуживает уважения и лайка), а кто тянет школу на дно.</p>
+            <h3>Как это работает?</h3>
+            <p>Находишь свою «мучительницу» или «любимицу» в списке.<br>Ставишь оценку. Чеснок. Без прикрас.<br>Комментируешь так, как есть. Приколы, истории с уроков, крики душнил — всё в топку.</p>
+            <p>Это не просто голосование. Это акт неповиновения. Это наш способ сказать спасибо тем, кто реально учит, и высветить тех, кто давно потерял связь с реальностью.</p>
+            <p>Добро пожаловать в ад, детка. Здесь жарко, весело и только честные оценки.</p>
+        </div>
+    `;
+    container.appendChild(aboutSection);
+}
 
 // ===== ФУНКЦИИ FIREBASE =====
 async function loadFromFirebase() {
@@ -133,33 +161,27 @@ async function saveToFirebase() {
 }
 
 function subscribeToUpdates() {
-    // Подписка на изменения голосов
     const votesRef = ref(db, 'votes');
     onValue(votesRef, (snapshot) => {
         if (snapshot.exists()) {
             votes = snapshot.val();
             updateAllDisplays();
-            console.log('🔄 Голоса обновлены');
         }
     });
 
-    // Подписка на изменения комментариев
     const commentsRef = ref(db, 'comments');
     onValue(commentsRef, (snapshot) => {
         if (snapshot.exists()) {
             comments = snapshot.val();
             renderComments();
-            console.log('🔄 Комментарии обновлены');
         }
     });
 
-    // Подписка на изменения лайков
     const likesRef = ref(db, 'commentLikes');
     onValue(likesRef, (snapshot) => {
         if (snapshot.exists()) {
             commentLikes = snapshot.val();
             renderComments();
-            console.log('🔄 Лайки обновлены');
         }
     });
 }
@@ -369,20 +391,52 @@ function renderComments() {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Страница загружена');
     
-    // Добавляем тестовое сообщение
-    const container = document.querySelector('.container');
-    if (container) {
-        const testDiv = document.createElement('div');
-        testDiv.style.background = '#00aa00';
-        testDiv.style.color = 'white';
-        testDiv.style.padding = '15px';
-        testDiv.style.margin = '10px';
-        testDiv.style.borderRadius = '10px';
-        testDiv.style.textAlign = 'center';
-        testDiv.style.fontSize = '18px';
-        testDiv.innerHTML = '✅ FIREBASE ВЕРСИЯ! Данные синхронизируются между устройствами.';
-        container.prepend(testDiv);
-    }
+    // Создаём секцию "О проекте"
+    createAboutSection();
+    
+    // Навигация по меню
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
+            this.classList.add('active-nav');
+            
+            const nav = this.dataset.nav;
+            currentNav = nav;
+            
+            // Получаем все секции
+            const winnersSection = document.querySelector('.winners-section');
+            const infoBox = document.querySelector('.info-box');
+            const selectionPanel = document.querySelector('.selection-panel');
+            const rouletteContainer = document.querySelector('.roulette-container');
+            const schoolLeaders = document.querySelector('.school-leaders');
+            const bottomPanel = document.querySelector('.bottom-panel');
+            const schoolActivity = document.querySelector('.school-activity');
+            const aboutSection = document.getElementById('aboutSection');
+            
+            // Скрываем всё
+            if (winnersSection) winnersSection.style.display = 'none';
+            if (infoBox) infoBox.style.display = 'none';
+            if (selectionPanel) selectionPanel.style.display = 'none';
+            if (rouletteContainer) rouletteContainer.style.display = 'none';
+            if (schoolLeaders) schoolLeaders.style.display = 'none';
+            if (bottomPanel) bottomPanel.style.display = 'none';
+            if (schoolActivity) schoolActivity.style.display = 'none';
+            if (aboutSection) aboutSection.style.display = 'none';
+            
+            // Показываем нужное
+            if (nav === 'main' || nav === 'rating' || nav === 'schools') {
+                if (winnersSection) winnersSection.style.display = 'block';
+                if (infoBox) infoBox.style.display = 'block';
+                if (selectionPanel) selectionPanel.style.display = 'flex';
+                if (rouletteContainer) rouletteContainer.style.display = 'block';
+                if (bottomPanel) bottomPanel.style.display = 'flex';
+                if (schoolActivity) schoolActivity.style.display = 'block';
+                if (currentSchool !== 'raion' && schoolLeaders) schoolLeaders.style.display = 'block';
+            } else if (nav === 'about') {
+                if (aboutSection) aboutSection.style.display = 'block';
+            }
+        });
+    });
 
     // Голосование
     document.getElementById('saveVoteBtn')?.addEventListener('click', async function() {
@@ -391,24 +445,19 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // Проверка, голосовал ли уже
         if (votes[currentSchool]?.[currentCategory]?.[selectedTeacher]?.includes(deviceId)) {
             alert('Ты уже голосовал в этой категории!');
             return;
         }
 
-        // Сохраняем голос
         if (!votes[currentSchool]) votes[currentSchool] = {};
         if (!votes[currentSchool][currentCategory]) votes[currentSchool][currentCategory] = {};
         if (!votes[currentSchool][currentCategory][selectedTeacher]) votes[currentSchool][currentCategory][selectedTeacher] = [];
         
         votes[currentSchool][currentCategory][selectedTeacher].push(deviceId);
-        
-        // Сохраняем в Firebase
         await saveToFirebase();
         
         alert(`✅ Голос за ${selectedTeacher} учтён!`);
-        
         document.getElementById('saveVoteBtn').disabled = true;
         selectedTeacher = null;
         document.querySelectorAll('.teacher-option').forEach(opt => opt.classList.remove('selected-teacher'));
