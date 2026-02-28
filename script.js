@@ -91,13 +91,27 @@ if (!deviceId) {
 let votes = { "33": {}, "13": {}, "29": {}, "raion": {} };
 let comments = { "33": [], "13": [], "29": [], "raion": [] };
 let commentLikes = {};
+let suggestions = [];
+let polls = [
+    {
+        id: 1,
+        question: "Устроить батл школ?",
+        options: ["Да", "Нет", "Воздержусь"],
+        votes: { "Да": [], "Нет": [], "Воздержусь": [] }
+    },
+    {
+        id: 2,
+        question: "Сделать еженедельные битвы?",
+        options: ["За", "Против", "Мне всё равно"],
+        votes: { "За": [], "Против": [], "Мне всё равно": [] }
+    }
+];
 
 // ===== СОЗДАЁМ СЕКЦИЮ "О ПРОЕКТЕ" =====
 function createAboutSection() {
     const container = document.querySelector('.container');
     if (!container) return;
     
-    // Проверяем, есть ли уже секция
     if (document.getElementById('aboutSection')) return;
     
     const aboutSection = document.createElement('div');
@@ -114,6 +128,7 @@ function createAboutSection() {
             <p>Находишь свою «мучительницу» или «любимицу» в списке.<br>Ставишь оценку. Чеснок. Без прикрас.<br>Комментируешь так, как есть. Приколы, истории с уроков, крики душнил — всё в топку.</p>
             <p>Это не просто голосование. Это акт неповиновения. Это наш способ сказать спасибо тем, кто реально учит, и высветить тех, кто давно потерял связь с реальностью.</p>
             <p>Добро пожаловать в ад, детка. Здесь жарко, весело и только честные оценки.</p>
+            <div class="about-ad">🔞 ТУТ МОЖЕТ БЫТЬ ТВОЯ РЕКЛАМА 🔥<br><small>пиши в tg боте</small></div>
         </div>
     `;
     container.appendChild(aboutSection);
@@ -126,24 +141,38 @@ async function loadFromFirebase() {
         const votesSnap = await get(votesRef);
         if (votesSnap.exists()) {
             votes = votesSnap.val();
-            console.log('✅ Голоса загружены');
         }
 
         const commentsRef = ref(db, 'comments');
         const commentsSnap = await get(commentsRef);
         if (commentsSnap.exists()) {
             comments = commentsSnap.val();
-            console.log('✅ Комментарии загружены');
         }
 
         const likesRef = ref(db, 'commentLikes');
         const likesSnap = await get(likesRef);
         if (likesSnap.exists()) {
             commentLikes = likesSnap.val();
-            console.log('✅ Лайки загружены');
         }
 
+        const suggestionsRef = ref(db, 'suggestions');
+        const suggestionsSnap = await get(suggestionsRef);
+        if (suggestionsSnap.exists()) {
+            suggestions = suggestionsSnap.val();
+        }
+
+        const pollsRef = ref(db, 'polls');
+        const pollsSnap = await get(pollsRef);
+        if (pollsSnap.exists()) {
+            polls = pollsSnap.val();
+        }
+
+        console.log('✅ Все данные загружены');
         updateAllDisplays();
+        if (currentNav === 'suggestions') {
+            renderSuggestions();
+            renderPolls();
+        }
     } catch (error) {
         console.error('❌ Ошибка загрузки из Firebase:', error);
     }
@@ -154,6 +183,8 @@ async function saveToFirebase() {
         await set(ref(db, 'votes'), votes);
         await set(ref(db, 'comments'), comments);
         await set(ref(db, 'commentLikes'), commentLikes);
+        await set(ref(db, 'suggestions'), suggestions);
+        await set(ref(db, 'polls'), polls);
         console.log('✅ Все данные сохранены в Firebase');
     } catch (error) {
         console.error('❌ Ошибка сохранения в Firebase:', error);
@@ -182,6 +213,16 @@ function subscribeToUpdates() {
         if (snapshot.exists()) {
             commentLikes = snapshot.val();
             renderComments();
+        }
+    });
+
+    const suggestionsRef = ref(db, 'suggestions');
+    onValue(suggestionsRef, (snapshot) => {
+        if (snapshot.exists()) {
+            suggestions = snapshot.val();
+            if (currentNav === 'suggestions') {
+                renderSuggestions();
+            }
         }
     });
 }
@@ -266,15 +307,51 @@ function updateActivityPodium() {
     
     let html = '';
     if (sorted[0]) {
-        html += `<div class="podium-place place-1"><div class="place-bar"><div class="school-name-podium">Школа ${sorted[0].school}</div><div class="school-score">${sorted[0].score}</div></div></div>`;
+        html += `
+            <div class="podium-place place-1">
+                <div class="place-number">👑 1 МЕСТО</div>
+                <div class="place-bar">
+                    <div class="school-name-podium">Школа ${sorted[0].school}</div>
+                    <div class="school-score">${sorted[0].score}</div>
+                    <div class="podium-stats">🔥 лидер голосования</div>
+                </div>
+            </div>
+        `;
     }
     if (sorted[1]) {
-        html += `<div class="podium-place place-2"><div class="place-bar"><div class="school-name-podium">Школа ${sorted[1].school}</div><div class="school-score">${sorted[1].score}</div></div></div>`;
+        html += `
+            <div class="podium-place place-2">
+                <div class="place-number">🥈 2 МЕСТО</div>
+                <div class="place-bar">
+                    <div class="school-name-podium">Школа ${sorted[1].school}</div>
+                    <div class="school-score">${sorted[1].score}</div>
+                    <div class="podium-stats">⭐ до первого: ${sorted[0] ? sorted[0].score - sorted[1].score : 0}</div>
+                </div>
+            </div>
+        `;
     }
     if (sorted[2]) {
-        html += `<div class="podium-place place-3"><div class="place-bar"><div class="school-name-podium">Школа ${sorted[2].school}</div><div class="school-score">${sorted[2].score}</div></div></div>`;
+        html += `
+            <div class="podium-place place-3">
+                <div class="place-number">🥉 3 МЕСТО</div>
+                <div class="place-bar">
+                    <div class="school-name-podium">Школа ${sorted[2].school}</div>
+                    <div class="school-score">${sorted[2].score}</div>
+                    <div class="podium-stats">📈 +${sorted[2].score} голосов</div>
+                </div>
+            </div>
+        `;
     }
     podium.innerHTML = html;
+}
+
+function getSchoolFromTeacher(teacher) {
+    for (let school of ["33", "13", "29"]) {
+        if (teachersDB[school].includes(teacher)) {
+            return school;
+        }
+    }
+    return "неизвестно";
 }
 
 function getDistrictWinners() {
@@ -294,7 +371,8 @@ function getDistrictWinners() {
                 }
             }
         }
-        winners[cat] = { name: winnerName, votes: maxCount };
+        const school = winnerName !== 'нет голосов' ? getSchoolFromTeacher(winnerName) : '';
+        winners[cat] = { name: winnerName, votes: maxCount, school: school };
     });
     return winners;
 }
@@ -309,11 +387,13 @@ function renderWinnersDistrict() {
     
     let html = '';
     Object.keys(winners).forEach((cat, idx) => {
+        const schoolText = winners[cat].school ? `(школа ${winners[cat].school})` : '';
         html += `
             <div class="winner-card">
                 <div class="winner-icon">${icons[idx]}</div>
                 <div class="winner-category">${catLabels[idx]}</div>
                 <div class="winner-name">${winners[cat].name}</div>
+                <div class="winner-school">${schoolText}</div>
                 <div class="winner-votes">🔥 ${winners[cat].votes} голосов 🔥</div>
             </div>
         `;
@@ -371,7 +451,7 @@ function renderComments() {
         
         html += `
             <div class="comment-item" data-comment-id="${commentId}">
-                <span class="comment-nick">${c.nick || 'Аноним'}:</span>
+                <span class="comment-nick">${c.nick}:</span>
                 <span class="comment-text">${c.text}</span>
                 <div class="comment-likes">
                     <button class="like-btn ${userLike}" data-action="like">👍</button>
@@ -387,6 +467,87 @@ function renderComments() {
     list.innerHTML = html;
 }
 
+function renderPolls() {
+    const pollsGrid = document.getElementById('pollsGrid');
+    if (!pollsGrid) return;
+    
+    let html = '';
+    polls.forEach(poll => {
+        html += `
+            <div class="poll-item" data-poll-id="${poll.id}">
+                <div class="poll-question">${poll.question}</div>
+                <div class="poll-options">
+                    ${poll.options.map(opt => {
+                        const hasVoted = poll.votes[opt] && poll.votes[opt].includes(deviceId);
+                        return `
+                            <button class="poll-btn ${hasVoted ? 'active-poll' : ''}" data-option="${opt}">
+                                ${opt} (${poll.votes[opt] ? poll.votes[opt].length : 0})
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    pollsGrid.innerHTML = html;
+    
+    document.querySelectorAll('.poll-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const pollItem = this.closest('.poll-item');
+            const pollId = pollItem.dataset.pollId;
+            const option = this.dataset.option;
+            const poll = polls.find(p => p.id == pollId);
+            
+            if (!poll) return;
+            
+            for (let opt in poll.votes) {
+                if (poll.votes[opt].includes(deviceId)) {
+                    alert('Ты уже голосовал в этом опросе!');
+                    return;
+                }
+            }
+            
+            if (!poll.votes[option]) {
+                poll.votes[option] = [];
+            }
+            
+            poll.votes[option].push(deviceId);
+            await saveToFirebase();
+            renderPolls();
+        });
+    });
+}
+
+function renderSuggestions() {
+    const container = document.getElementById('suggestionsContainer');
+    if (!container) return;
+    
+    const userSuggestions = suggestions.filter(s => 
+        s.deviceId === deviceId || deviceId.startsWith('admin_')
+    );
+    
+    let html = '';
+    userSuggestions.reverse().forEach(s => {
+        html += `
+            <div class="suggestion-item">
+                <div class="suggestion-meta">
+                    <span class="suggestion-author">${s.nick}</span>
+                    <span class="suggestion-school-tag">${s.school}</span>
+                    <span>${new Date(s.timestamp).toLocaleString()}</span>
+                </div>
+                <div class="suggestion-content">${s.text}</div>
+            </div>
+        `;
+    });
+    
+    if (!html) {
+        html = '<div class="suggestion-item">Пока нет предложений. Будь первым!</div>';
+    }
+    
+    container.innerHTML = html;
+}
+
 // ===== ОБРАБОТЧИКИ СОБЫТИЙ =====
 document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Страница загружена');
@@ -394,8 +555,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // Создаём секцию "О проекте"
     createAboutSection();
     
-    // Навигация по меню
+    // Добавляем кнопку TG канала рядом с TG ботом
+    const header = document.querySelector('.header');
+    if (header) {
+        const tgChannelBtn = document.createElement('a');
+        tgChannelBtn.href = 'https://t.me/+0asI7j0d65Q2NDBi';
+        tgChannelBtn.target = '_blank';
+        tgChannelBtn.className = 'tg-button tg-channel';
+        tgChannelBtn.style.marginLeft = '10px';
+        tgChannelBtn.innerHTML = '📢 TG КАНАЛ';
+        header.appendChild(tgChannelBtn);
+    }
+    
+    // Навигация по меню (убраны разделы Рейтинги и Школы)
     document.querySelectorAll('.nav-item').forEach(item => {
+        if (item.dataset.nav === 'rating' || item.dataset.nav === 'schools') {
+            item.style.display = 'none';
+        }
+        
         item.addEventListener('click', function() {
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
             this.classList.add('active-nav');
@@ -403,7 +580,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const nav = this.dataset.nav;
             currentNav = nav;
             
-            // Получаем все секции
             const winnersSection = document.querySelector('.winners-section');
             const infoBox = document.querySelector('.info-box');
             const selectionPanel = document.querySelector('.selection-panel');
@@ -412,6 +588,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const bottomPanel = document.querySelector('.bottom-panel');
             const schoolActivity = document.querySelector('.school-activity');
             const aboutSection = document.getElementById('aboutSection');
+            const suggestionsSection = document.getElementById('suggestionsSection');
             
             // Скрываем всё
             if (winnersSection) winnersSection.style.display = 'none';
@@ -422,9 +599,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (bottomPanel) bottomPanel.style.display = 'none';
             if (schoolActivity) schoolActivity.style.display = 'none';
             if (aboutSection) aboutSection.style.display = 'none';
+            if (suggestionsSection) suggestionsSection.style.display = 'none';
             
             // Показываем нужное
-            if (nav === 'main' || nav === 'rating' || nav === 'schools') {
+            if (nav === 'main') {
                 if (winnersSection) winnersSection.style.display = 'block';
                 if (infoBox) infoBox.style.display = 'block';
                 if (selectionPanel) selectionPanel.style.display = 'flex';
@@ -432,6 +610,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (bottomPanel) bottomPanel.style.display = 'flex';
                 if (schoolActivity) schoolActivity.style.display = 'block';
                 if (currentSchool !== 'raion' && schoolLeaders) schoolLeaders.style.display = 'block';
+            } else if (nav === 'suggestions') {
+                if (suggestionsSection) {
+                    suggestionsSection.style.display = 'block';
+                    renderSuggestions();
+                    renderPolls();
+                }
             } else if (nav === 'about') {
                 if (aboutSection) aboutSection.style.display = 'block';
             }
@@ -491,6 +675,37 @@ document.addEventListener('DOMContentLoaded', function() {
         if (textInput) textInput.value = '';
     });
 
+    // Отправка предложения
+    document.getElementById('sendSuggestion')?.addEventListener('click', async function() {
+        const nickInput = document.getElementById('suggestionNick');
+        const schoolSelect = document.getElementById('suggestionSchool');
+        const textInput = document.getElementById('suggestionText');
+        
+        const nick = nickInput?.value.trim();
+        const school = schoolSelect?.value;
+        const text = textInput?.value.trim();
+        
+        if (!nick || !school || !text) {
+            alert('Заполни все поля!');
+            return;
+        }
+        
+        suggestions.push({
+            nick: nick,
+            school: school,
+            text: text,
+            deviceId: deviceId,
+            timestamp: Date.now()
+        });
+        
+        await saveToFirebase();
+        renderSuggestions();
+        
+        if (nickInput) nickInput.value = '';
+        if (schoolSelect) schoolSelect.value = '';
+        if (textInput) textInput.value = '';
+    });
+
     // Обработчики лайков
     document.addEventListener('click', async function(e) {
         if (e.target.classList.contains('like-btn') || e.target.classList.contains('dislike-btn')) {
@@ -524,6 +739,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             await saveToFirebase();
+            renderComments();
         }
     });
 
