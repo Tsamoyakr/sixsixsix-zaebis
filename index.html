@@ -3,50 +3,58 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SixSixSix_ZAEBIS | Тест</title>
+    <title>SixSixSix_ZAEBIS | Демонический рейтинг</title>
+    <link rel="stylesheet" href="styles.css">
 </head>
-<body style="background: #1a1a1a; color: #ffcccc; font-family: Arial; padding: 20px;">
-    <h1>SixSixSix ZAEBIS - ТЕСТ</h1>
-    
+<body>
     <div class="container">
+        <!-- Шапка -->
         <div class="header">
-            <div class="site-title">SixSixSix_ZAEBIS</div>
-            <a href="https://t.me/SixSixSix_ZAEBIS_bot" target="_blank" class="tg-button">TG BOT</a>
+            <div class="site-title"><span>S</span>ix<span>Six</span>Six_<span>Z</span>AEBIS</div>
+            <a href="https://t.me/SixSixSix_ZAEBIS_bot" target="_blank" class="tg-button">💬 TG BOT</a>
         </div>
 
+        <!-- Меню навигации -->
         <div class="nav-menu">
-            <div class="nav-item active-nav">🏠 ГЛАВНАЯ</div>
-            <div class="nav-item">📊 РЕЙТИНГИ</div>
-            <div class="nav-item">🏫 ШКОЛЫ</div>
-            <div class="nav-item">💡 ПРЕДЛОЖЕНИЯ</div>
-            <div class="nav-item">🔥 О ПРОЕКТЕ</div>
+            <div class="nav-item active-nav" data-nav="main">🏠 Главная</div>
+            <div class="nav-item" data-nav="rating">📊 Рейтинги</div>
+            <div class="nav-item" data-nav="schools">🏫 Школы</div>
+            <div class="nav-item" data-nav="suggestions">💡 Предложения</div>
+            <div class="nav-item" data-nav="about">🔥 О проекте</div>
         </div>
 
+        <!-- Рейтинг активности школ -->
         <div class="school-activity">
             <div class="activity-title">⚡ РЕЙТИНГ АКТИВНОСТИ ШКОЛ ⚡</div>
-            <div id="activityPodium"></div>
+            <div class="activity-podium" id="activityPodium"></div>
         </div>
 
+        <!-- Победители района -->
         <div class="winners-section">
             <div class="winners-title">👑 ПОБЕДИТЕЛИ РАЙОНА 👑</div>
             <div class="winners-grid" id="winnersGrid"></div>
             <div class="timer-block" id="timerDisplay">ОБНОВЛЕНИЕ ЧЕРЕЗ: --д --ч --м</div>
         </div>
 
+        <!-- Информация -->
         <div class="info-box">
             <div class="info-title">🔞 КАК ЭТО РАБОТАЕТ?</div>
             <div class="info-text">
-                🔥 Выбирай школу → крути рулетку → жми СОХРАНИТЬ!
+                🔥 Выбирай <span>школу</span> → крути <span>рулетку</span> → жми <span>СОХРАНИТЬ</span>!<br>
+                💋 <span>Один голос</span> с устройства в каждой категории.<br>
+                👅 Все голоса синхронизируются между устройствами!
             </div>
         </div>
 
+        <!-- Кнопки выбора школы -->
         <div class="selection-panel">
             <div class="school-btn active" data-school="33">33 ШКОЛА</div>
             <div class="school-btn" data-school="13">13 ШКОЛА</div>
             <div class="school-btn" data-school="29">29 ШКОЛА</div>
-            <div class="school-btn raion" data-school="raion">РАЙОН</div>
+            <div class="school-btn raion" data-school="raion">РАЙОН (ВСЕ)</div>
         </div>
 
+        <!-- Фильтр для района -->
         <div class="school-filter" id="schoolFilter" style="display: none;">
             <div class="filter-btn active-filter" data-filter-school="all">Все школы</div>
             <div class="filter-btn" data-filter-school="33">33 школа</div>
@@ -54,13 +62,14 @@
             <div class="filter-btn" data-filter-school="29">29 школа</div>
         </div>
 
+        <!-- Рулетка -->
         <div class="roulette-container">
-            <div class="category-tabs">
+            <div class="category-tabs" id="categoryTabs">
                 <div class="cat-btn active-cat" data-cat="sexy">💋 Самая секси</div>
                 <div class="cat-btn" data-cat="good">😇 Самая добрая</div>
                 <div class="cat-btn" data-cat="mraz">👿 Самая мразота</div>
                 <div class="cat-btn" data-cat="fun">🔥 Самая угарная</div>
-                <div class="cat-btn" data-cat="chill">😎 Чиловый мужик</div>
+                <div class="cat-btn" data-cat="chill">😎 Самый чиловый мужик</div>
             </div>
 
             <div class="selection-area">
@@ -69,28 +78,33 @@
             </div>
         </div>
 
+        <!-- Лидеры школы -->
         <div class="school-leaders" id="schoolLeadersBlock">
-            <div class="leaders-title">ЛИДЕРЫ ШКОЛЫ 33</div>
+            <div class="leaders-title" id="leadersTitle">ЛИДЕРЫ ШКОЛЫ 33</div>
             <div class="leaders-grid" id="leadersGrid"></div>
         </div>
 
+        <!-- Комментарии и реклама -->
         <div class="bottom-panel">
             <div class="comments-block">
-                <div class="comments-title">💬 КОММЕНТАРИИ</div>
+                <div class="comments-title">💬 ТРЕП (комментарии)</div>
                 <div class="comment-list" id="commentList"></div>
                 <div class="comment-input-area">
-                    <input type="text" class="nick-input" id="nickInput" placeholder="ник...">
-                    <input type="text" class="comment-input" id="commentInput" placeholder="комментарий...">
+                    <input type="text" class="nick-input" id="nickInput" placeholder="твой ник..." maxlength="20">
+                    <input type="text" class="comment-input" id="commentInput" placeholder="комментарий..." maxlength="100">
                     <button class="comment-send" id="sendComment">🔥 ОТПРАВИТЬ</button>
                 </div>
             </div>
             <div class="ad-block">
-                <div class="ad-banner">🔞 РЕКЛАМА</div>
+                <div class="ad-banner">🔞 ПОШЛАЯ РЕКЛАМА<br><small>тут мог быть твой притон</small></div>
+                <div class="ad-banner">💀 АДМИНСКАЯ РЕКЛАМА<br><small>пиши в тг боте</small></div>
             </div>
         </div>
+
+        <div class="footer-note">💋 666 — голосуй порочно, но честно 🔥</div>
     </div>
 
-    <!-- ВАЖНО: правильное подключение скрипта -->
+    <!-- Подключение скрипта - ВАЖНО! -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
