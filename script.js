@@ -13,7 +13,6 @@ const firebaseConfig = {
     measurementId: "G-FNG1JSVFGM"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 // ========================================
@@ -80,6 +79,7 @@ let currentSchool = "33";
 let currentCategory = "sexy";
 let selectedTeacher = null;
 let filterSchool = "all";
+let currentNav = "main";
 
 // ID устройства
 let deviceId = localStorage.getItem('deviceId');
@@ -92,6 +92,21 @@ if (!deviceId) {
 let votes = { "33": {}, "13": {}, "29": {}, "raion": {} };
 let comments = { "33": [], "13": [], "29": [], "raion": [] };
 let commentLikes = {};
+let suggestions = [];
+let polls = [
+    {
+        id: 1,
+        question: "Устроить батл школ?",
+        options: ["Да", "Нет", "Воздержусь"],
+        votes: { "Да": [], "Нет": [], "Воздержусь": [] }
+    },
+    {
+        id: 2,
+        question: "Сделать еженедельные битвы?",
+        options: ["За", "Против", "Мне всё равно"],
+        votes: { "За": [], "Против": [], "Мне всё равно": [] }
+    }
+];
 
 // ===== ФУНКЦИИ FIREBASE =====
 async function loadFromFirebase() {
@@ -108,9 +123,21 @@ async function loadFromFirebase() {
         const likesSnap = await get(likesRef);
         if (likesSnap.exists()) commentLikes = likesSnap.val();
 
+        const suggestionsRef = ref(db, 'suggestions');
+        const suggestionsSnap = await get(suggestionsRef);
+        if (suggestionsSnap.exists()) suggestions = suggestionsSnap.val();
+
+        const pollsRef = ref(db, 'polls');
+        const pollsSnap = await get(pollsRef);
+        if (pollsSnap.exists()) polls = pollsSnap.val();
+
         console.log('✅ Загружено из Firebase');
         updateAllDisplays();
         renderComments();
+        if (currentNav === 'suggestions') {
+            renderSuggestions();
+            renderPolls();
+        }
     } catch (error) {
         console.error('❌ Ошибка загрузки:', error);
     }
@@ -121,6 +148,8 @@ async function saveToFirebase() {
         await set(ref(db, 'votes'), votes);
         await set(ref(db, 'comments'), comments);
         await set(ref(db, 'commentLikes'), commentLikes);
+        await set(ref(db, 'suggestions'), suggestions);
+        await set(ref(db, 'polls'), polls);
         console.log('✅ Сохранено в Firebase');
     } catch (error) {
         console.error('❌ Ошибка сохранения:', error);
@@ -133,6 +162,7 @@ function subscribeToUpdates() {
         if (snapshot.exists()) {
             votes = snapshot.val();
             updateAllDisplays();
+            renderSchoolLeaders();
         }
     });
 
@@ -148,8 +178,10 @@ function subscribeToUpdates() {
 // ===== ФУНКЦИИ ИНТЕРФЕЙСА =====
 function updateAllDisplays() {
     updateActivityPodium();
-    updateWinnersDistrict();
-    renderSchoolLeaders();
+    renderWinnersDistrict(); // Теперь район не обновляется в реальном времени
+    if (currentSchool !== 'raion') {
+        renderSchoolLeaders();
+    }
 }
 
 function getFilteredTeachers() {
@@ -257,7 +289,7 @@ function getDistrictWinners() {
     return winners;
 }
 
-function updateWinnersDistrict() {
+function renderWinnersDistrict() {
     const grid = document.getElementById('winnersGrid');
     if (!grid) return;
     
@@ -272,7 +304,7 @@ function updateWinnersDistrict() {
                 <div class="winner-icon">${icons[idx]}</div>
                 <div class="winner-category">${catLabels[idx]}</div>
                 <div class="winner-name">${winners[cat].name}</div>
-                <div style="font-size: 14px; color: #ffa5a5;">${winners[cat].votes} голосов</div>
+                <div class="winner-votes">🔥 ${winners[cat].votes} голосов 🔥</div>
             </div>
         `;
     });
@@ -306,7 +338,7 @@ function renderSchoolLeaders() {
             <div class="leader-cat-block">
                 <div class="leader-cat-name">${catLabels[idx]}</div>
                 <div class="leader-teacher">${topTeacher}</div>
-                <div style="color:#b77; font-size:14px; text-align:center;">голосов: ${maxCount}</div>
+                <div class="leader-votes">⚡ ${maxCount} голосов ⚡</div>
             </div>
         `;
     });
@@ -341,7 +373,7 @@ function renderComments() {
         `;
     });
     
-    if (!html) html = '<div class="comment-item">тишина... напиши что-нибудь</div>';
+    if (!html) html = '<div class="comment-item">💬 Напиши первый комментарий! Твой никнейм сохранится по ID устройства</div>';
     list.innerHTML = html;
     
     document.querySelectorAll('.like-btn, .dislike-btn').forEach(btn => {
@@ -379,8 +411,98 @@ function renderComments() {
     });
 }
 
+function renderPolls() {
+    const pollsGrid = document.getElementById('pollsGrid');
+    if (!pollsGrid) return;
+    
+    let html = '';
+    polls.forEach(poll => {
+        html += `
+            <div class="poll-item" data-poll-id="${poll.id}">
+                <div class="poll-question">${poll.question}</div>
+                <div class="poll-options">
+                    ${poll.options.map(opt => {
+                        const hasVoted = poll.votes[opt] && poll.votes[opt].includes(deviceId);
+                        return `
+                            <button class="poll-btn ${hasVoted ? 'active-poll' : ''}" data-option="${opt}">
+                                ${opt} (${poll.votes[opt] ? poll.votes[opt].length : 0})
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    });
+    
+    pollsGrid.innerHTML = html;
+    
+    document.querySelectorAll('.poll-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const pollItem = this.closest('.poll-item');
+            const pollId = pollItem.dataset.pollId;
+            const option = this.dataset.option;
+            const poll = polls.find(p => p.id == pollId);
+            
+            if (!poll) return;
+            
+            for (let opt in poll.votes) {
+                if (poll.votes[opt].includes(deviceId)) {
+                    alert('Ты уже голосовал в этом опросе!');
+                    return;
+                }
+            }
+            
+            if (!poll.votes[option]) {
+                poll.votes[option] = [];
+            }
+            
+            poll.votes[option].push(deviceId);
+            await saveToFirebase();
+            renderPolls();
+        });
+    });
+}
+
+function renderSuggestions() {
+    const container = document.getElementById('suggestionsContainer');
+    if (!container) return;
+    
+    const userSuggestions = suggestions.filter(s => 
+        s.deviceId === deviceId || deviceId.startsWith('admin_')
+    );
+    
+    let html = '';
+    userSuggestions.reverse().forEach(s => {
+        html += `
+            <div class="suggestion-item">
+                <div class="suggestion-meta">
+                    <span class="suggestion-author">${s.nick}</span>
+                    <span class="suggestion-school-tag">${s.school}</span>
+                    <span>${new Date(s.timestamp).toLocaleString()}</span>
+                </div>
+                <div class="suggestion-content">${s.text}</div>
+            </div>
+        `;
+    });
+    
+    if (!html) {
+        html = '<div class="suggestion-item">Пока нет предложений</div>';
+    }
+    
+    container.innerHTML = html;
+}
+
 // ===== ОБРАБОТЧИКИ СОБЫТИЙ =====
 document.addEventListener('DOMContentLoaded', function() {
+    // Верхняя реклама
+    const container = document.querySelector('.container');
+    if (container) {
+        const topAd = document.createElement('div');
+        topAd.className = 'top-ad';
+        topAd.innerHTML = '🔥 ТУТ МОЖЕТ БЫТЬ ТВОЯ РЕКЛАМА 🔥<br><small>пиши в tg боте</small>';
+        container.insertBefore(topAd, container.firstChild);
+    }
+
     // Голосование
     document.getElementById('saveVoteBtn')?.addEventListener('click', async function() {
         if (!selectedTeacher) return;
@@ -429,6 +551,37 @@ document.addEventListener('DOMContentLoaded', function() {
         renderComments();
         
         if (nickInput) nickInput.value = '';
+        if (textInput) textInput.value = '';
+    });
+
+    // Отправка предложения
+    document.getElementById('sendSuggestion')?.addEventListener('click', async function() {
+        const nickInput = document.getElementById('suggestionNick');
+        const schoolSelect = document.getElementById('suggestionSchool');
+        const textInput = document.getElementById('suggestionText');
+        
+        const nick = nickInput?.value.trim();
+        const school = schoolSelect?.value;
+        const text = textInput?.value.trim();
+        
+        if (!nick || !school || !text) {
+            alert('Заполни все поля!');
+            return;
+        }
+        
+        suggestions.push({
+            nick: nick,
+            school: school,
+            text: text,
+            deviceId: deviceId,
+            timestamp: Date.now()
+        });
+        
+        await saveToFirebase();
+        renderSuggestions();
+        
+        if (nickInput) nickInput.value = '';
+        if (schoolSelect) schoolSelect.value = '';
         if (textInput) textInput.value = '';
     });
 
@@ -505,43 +658,102 @@ document.addEventListener('DOMContentLoaded', function() {
             this.classList.add('active-nav');
             
             const nav = this.dataset.nav;
-            const suggestionsSection = document.getElementById('suggestionsSection');
+            currentNav = nav;
             
-            if (nav === 'suggestions') {
+            const winnersSection = document.querySelector('.winners-section');
+            const infoBox = document.querySelector('.info-box');
+            const selectionPanel = document.querySelector('.selection-panel');
+            const rouletteContainer = document.querySelector('.roulette-container');
+            const schoolLeaders = document.querySelector('.school-leaders');
+            const bottomPanel = document.querySelector('.bottom-panel');
+            const suggestionsSection = document.getElementById('suggestionsSection');
+            const aboutSection = document.getElementById('aboutSection');
+            
+            // Скрываем всё
+            if (winnersSection) winnersSection.style.display = 'none';
+            if (infoBox) infoBox.style.display = 'none';
+            if (selectionPanel) selectionPanel.style.display = 'none';
+            if (rouletteContainer) rouletteContainer.style.display = 'none';
+            if (schoolLeaders) schoolLeaders.style.display = 'none';
+            if (bottomPanel) bottomPanel.style.display = 'none';
+            if (suggestionsSection) suggestionsSection.style.display = 'none';
+            if (aboutSection) aboutSection.style.display = 'none';
+            
+            // Показываем нужное
+            if (nav === 'main') {
+                if (winnersSection) winnersSection.style.display = 'block';
+                if (infoBox) infoBox.style.display = 'block';
+                if (selectionPanel) selectionPanel.style.display = 'flex';
+                if (rouletteContainer) rouletteContainer.style.display = 'block';
+                if (bottomPanel) bottomPanel.style.display = 'flex';
+                if (currentSchool !== 'raion' && schoolLeaders) schoolLeaders.style.display = 'block';
+            } else if (nav === 'rating' || nav === 'schools') {
+                if (winnersSection) winnersSection.style.display = 'block';
+                if (infoBox) infoBox.style.display = 'block';
+                if (selectionPanel) selectionPanel.style.display = 'flex';
+                if (rouletteContainer) rouletteContainer.style.display = 'block';
+                if (bottomPanel) bottomPanel.style.display = 'flex';
+                if (currentSchool !== 'raion' && schoolLeaders) schoolLeaders.style.display = 'block';
+            } else if (nav === 'suggestions') {
                 if (suggestionsSection) suggestionsSection.style.display = 'block';
-            } else {
-                if (suggestionsSection) suggestionsSection.style.display = 'none';
+                renderSuggestions();
+                renderPolls();
+            } else if (nav === 'about') {
+                if (aboutSection) aboutSection.style.display = 'block';
             }
         });
     });
 
-    // Таймер
+    // Таймер до понедельника 9:00
     function updateTimer() {
         const now = new Date();
         const target = new Date();
+        
+        // Следующий понедельник 9:00
+        target.setDate(target.getDate() + ((1 + 7 - target.getDay()) % 7));
         target.setHours(9, 0, 0, 0);
-        if (target <= now) target.setDate(target.getDate() + 1);
+        
+        if (target < now) target.setDate(target.getDate() + 7);
         
         const diff = target - now;
-        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
         
         const timerDisplay = document.getElementById('timerDisplay');
         if (timerDisplay) {
-            timerDisplay.innerText = `ОБНОВЛЕНИЕ ЧЕРЕЗ: ${hours}ч ${minutes}м`;
+            timerDisplay.innerText = `ОБНОВЛЕНИЕ ЧЕРЕЗ: ${days}д ${hours}ч ${minutes}м`;
         }
     }
 
-    // Инициализация
-    loadFromFirebase();
-    subscribeToUpdates();
-    renderTeacherWheel();
-    renderComments();
-    updateAllDisplays();
-    updateTimer();
-    setInterval(updateTimer, 60000);
-    
-    // Скрываем секцию предложений
+    // Создаём секцию "О проекте"
+    const container = document.querySelector('.container');
+    if (container && !document.getElementById('aboutSection')) {
+        const aboutSection = document.createElement('div');
+        aboutSection.id = 'aboutSection';
+        aboutSection.className = 'about-section';
+        aboutSection.style.display = 'none';
+        aboutSection.innerHTML = `
+            <div class="about-content">
+                <h2>О ПРОЕКТЕ / МАНИФЕСТ</h2>
+                <p>Школа — это ад.<br>Душные уроки, крики по утрам и куча домашнего ада. Но есть в этом филиале преисподней те, кто делает это место чуть менее невыносимым. Или наоборот — превращают его в настоящий кошмар.</p>
+                <p>SixSixSix Zaebis — это народный рейтинг учителей, свободный от лицемерия и школьной цензуры.</p>
+                <p>Мы не собираем грамоты и не целуем руки. Мы собираем голоса. Здесь ученики решают, кто реально «Zaebis» (то есть заслуживает уважения и лайка), а кто тянет школу на дно.</p>
+                <h3>Как это работает?</h3>
+                <p>Находишь свою «мучительницу» или «любимицу» в списке.<br>Ставишь оценку. Чеснок. Без прикрас.<br>Комментируешь так, как есть. Приколы, истории с уроков, крики душнил — всё в топку.</p>
+                <p>Это не просто голосование. Это акт неповиновения. Это наш способ сказать спасибо тем, кто реально учит, и высветить тех, кто давно потерял связь с реальностью.</p>
+                <p>Добро пожаловать в ад, детка. Здесь жарко, весело и только честные оценки.</p>
+                <div class="about-ad">🔥 ТУТ МОЖЕТ БЫТЬ ТВОЯ РЕКЛАМА 🔥<br><small>пиши в tg боте</small></div>
+            </div>
+        `;
+        container.appendChild(aboutSection);
+    }
+
+    // Добавляем TG канал в предложения
     const suggestionsSection = document.getElementById('suggestionsSection');
-    if (suggestionsSection) suggestionsSection.style.display = 'none';
-});
+    if (suggestionsSection) {
+        const tgChannel = document.createElement('div');
+        tgChannel.className = 'tg-channel-block';
+        tgChannel.innerHTML = `
+            <div class="tg-channel-content">
+                <div class="tg-channel-title">📢 Н
