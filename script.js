@@ -26,8 +26,8 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Страница загружена');
     
     // 1. ПРОВЕРКА КНОПОК - добавим тестовую кнопку
-    const container = document.querySelector('.container');
-    if (container) {
+    const mainContainer = document.querySelector('.container');
+    if (mainContainer) {
         const testDiv = document.createElement('div');
         testDiv.style.background = '#00aa00';
         testDiv.style.color = 'white';
@@ -41,13 +41,13 @@ document.addEventListener('DOMContentLoaded', function() {
             <button id="testBtn" style="padding:10px 20px; margin:10px; background:#ff0000; color:white; border:none; border-radius:5px; cursor:pointer;">НАЖМИ МЕНЯ</button>
             <div id="testResult">Кнопка не нажата</div>
         `;
-        container.prepend(testDiv);
+        mainContainer.prepend(testDiv);
         
-        // Обработчик кнопки
+        // Обработчик тестовой кнопки
         document.getElementById('testBtn').addEventListener('click', function() {
             counter++;
             document.getElementById('testResult').innerHTML = `✅ Кнопка работает! Нажата ${counter} раз`;
-            console.log('✅ Кнопка нажата!');
+            console.log('✅ Тестовая кнопка нажата!');
         });
     }
     
@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', function() {
     set(testRef, {
         message: 'Привет от устройства!',
         time: Date.now(),
-        deviceId: 'test'
+        deviceId: 'test_' + Math.random()
     }).then(() => {
         console.log('✅ Запись в Firebase успешна');
     }).catch(error => {
@@ -82,7 +82,7 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('✅ Кнопка СОХРАНИТЬ ВЫБОР работает!');
         });
     } else {
-        console.log('❌ Кнопка сохранения НЕ найдена');
+        console.log('❌ Кнопка сохранения НЕ найдена - проверь id="saveVoteBtn" в HTML');
     }
     
     const sendCommentBtn = document.getElementById('sendComment');
@@ -92,14 +92,32 @@ document.addEventListener('DOMContentLoaded', function() {
             alert('✅ Кнопка ОТПРАВИТЬ работает!');
         });
     } else {
-        console.log('❌ Кнопка комментария НЕ найдена');
+        console.log('❌ Кнопка комментария НЕ найдена - проверь id="sendComment" в HTML');
     }
     
     // Проверяем все кнопки школы
-    document.querySelectorAll('.school-btn').forEach((btn, index) => {
-        console.log(`✅ Кнопка школы ${index} найдена`);
-        btn.addEventListener('click', function() {
-            alert(`✅ Нажата кнопка: ${this.innerText}`);
+    const schoolBtns = document.querySelectorAll('.school-btn');
+    if (schoolBtns.length > 0) {
+        console.log(`✅ Найдено ${schoolBtns.length} кнопок школы`);
+        schoolBtns.forEach((btn, index) => {
+            btn.addEventListener('click', function() {
+                alert(`✅ Нажата кнопка: ${this.innerText}`);
+            });
         });
-    });
+    } else {
+        console.log('❌ Кнопки школы НЕ найдены - проверь class="school-btn" в HTML');
+    }
+    
+    // Проверяем кнопки категорий
+    const catBtns = document.querySelectorAll('.cat-btn');
+    if (catBtns.length > 0) {
+        console.log(`✅ Найдено ${catBtns.length} кнопок категорий`);
+        catBtns.forEach((btn, index) => {
+            btn.addEventListener('click', function() {
+                alert(`✅ Нажата категория: ${this.innerText}`);
+            });
+        });
+    } else {
+        console.log('❌ Кнопки категорий НЕ найдены - проверь class="cat-btn" в HTML');
+    }
 });
