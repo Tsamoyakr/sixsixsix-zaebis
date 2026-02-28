@@ -1,4 +1,4 @@
-// ========== НАСТРОЙКИ FIREBASE ==========
+// ========== НАСТРОЙКИ FIREBASE ==========// ========== НАСТРОЙКИ FIREBASE ==========
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
 
@@ -92,6 +92,7 @@ let votes = { "33": {}, "13": {}, "29": {}, "raion": {} };
 let comments = { "33": [], "13": [], "29": [], "raion": [] };
 let commentLikes = {};
 let suggestions = [];
+let suggestionLikes = {}; // Для лайков предложений
 let polls = [
     {
         id: 1,
@@ -101,9 +102,15 @@ let polls = [
     },
     {
         id: 2,
-        question: "Сделать еженедельные битвы?",
+        question: "Делать еженедельные битвы?",
         options: ["За", "Против", "Мне всё равно"],
         votes: { "За": [], "Против": [], "Мне всё равно": [] }
+    },
+    {
+        id: 3,
+        question: "Голосования среди учеников?",
+        options: ["Да", "Нет"],
+        votes: { "Да": [], "Нет": [] }
     }
 ];
 
@@ -149,16 +156,22 @@ async function loadFromFirebase() {
             comments = commentsSnap.val();
         }
 
-        const likesRef = ref(db, 'commentLikes');
-        const likesSnap = await get(likesRef);
-        if (likesSnap.exists()) {
-            commentLikes = likesSnap.val();
+        const commentLikesRef = ref(db, 'commentLikes');
+        const commentLikesSnap = await get(commentLikesRef);
+        if (commentLikesSnap.exists()) {
+            commentLikes = commentLikesSnap.val();
         }
 
         const suggestionsRef = ref(db, 'suggestions');
         const suggestionsSnap = await get(suggestionsRef);
         if (suggestionsSnap.exists()) {
             suggestions = suggestionsSnap.val();
+        }
+
+        const suggestionLikesRef = ref(db, 'suggestionLikes');
+        const suggestionLikesSnap = await get(suggestionLikesRef);
+        if (suggestionLikesSnap.exists()) {
+            suggestionLikes = suggestionLikesSnap.val();
         }
 
         const pollsRef = ref(db, 'polls');
@@ -184,6 +197,7 @@ async function saveToFirebase() {
         await set(ref(db, 'comments'), comments);
         await set(ref(db, 'commentLikes'), commentLikes);
         await set(ref(db, 'suggestions'), suggestions);
+        await set(ref(db, 'suggestionLikes'), suggestionLikes);
         await set(ref(db, 'polls'), polls);
         console.log('✅ Все данные сохранены в Firebase');
     } catch (error) {
@@ -208,8 +222,8 @@ function subscribeToUpdates() {
         }
     });
 
-    const likesRef = ref(db, 'commentLikes');
-    onValue(likesRef, (snapshot) => {
+    const commentLikesRef = ref(db, 'commentLikes');
+    onValue(commentLikesRef, (snapshot) => {
         if (snapshot.exists()) {
             commentLikes = snapshot.val();
             renderComments();
@@ -220,6 +234,16 @@ function subscribeToUpdates() {
     onValue(suggestionsRef, (snapshot) => {
         if (snapshot.exists()) {
             suggestions = snapshot.val();
+            if (currentNav === 'suggestions') {
+                renderSuggestions();
+            }
+        }
+    });
+
+    const suggestionLikesRef = ref(db, 'suggestionLikes');
+    onValue(suggestionLikesRef, (snapshot) => {
+        if (snapshot.exists()) {
+            suggestionLikes = snapshot.val();
             if (currentNav === 'suggestions') {
                 renderSuggestions();
             }
@@ -454,9 +478,9 @@ function renderComments() {
                 <span class="comment-nick">${c.nick}:</span>
                 <span class="comment-text">${c.text}</span>
                 <div class="comment-likes">
-                    <button class="like-btn ${userLike}" data-action="like">👍</button>
+                    <button class="like-btn ${userLike}" data-type="comment" data-action="like">👍</button>
                     <span class="like-count">${likes.likes.length}</span>
-                    <button class="dislike-btn ${userDislike}" data-action="dislike">👎</button>
+                    <button class="dislike-btn ${userDislike}" data-type="comment" data-action="dislike">👎</button>
                     <span class="dislike-count">${likes.dislikes.length}</span>
                 </div>
             </div>
@@ -491,52 +515,67 @@ function renderPolls() {
     });
     
     pollsGrid.innerHTML = html;
-    
-    document.querySelectorAll('.poll-btn').forEach(btn => {
-        btn.addEventListener('click', async function() {
-            const pollItem = this.closest('.poll-item');
-            const pollId = pollItem.dataset.pollId;
-            const option = this.dataset.option;
-            const poll = polls.find(p => p.id == pollId);
-            
-            if (!poll) return;
-            
-            for (let opt in poll.votes) {
-                if (poll.votes[opt].includes(deviceId)) {
-                    alert('Ты уже голосовал в этом опросе!');
-                    return;
-                }
-            }
-            
-            if (!poll.votes[option]) {
-                poll.votes[option] = [];
-            }
-            
-            poll.votes[option].push(deviceId);
-            await saveToFirebase();
-            renderPolls();
-        });
-    });
 }
 
 function renderSuggestions() {
     const container = document.getElementById('suggestionsContainer');
+    const topContainer = document.getElementById('topSuggestions');
     if (!container) return;
     
-    const userSuggestions = suggestions.filter(s => 
-        s.deviceId === deviceId || deviceId.startsWith('admin_')
-    );
+    // Сортируем предложения по лайкам для топа
+    const suggestionsWithLikes = suggestions.map(s => {
+        const likes = suggestionLikes[s.id] || { likes: [], dislikes: [] };
+        return {
+            ...s,
+            likeCount: likes.likes.length,
+            dislikeCount: likes.dislikes.length
+        };
+    });
     
+    // Топ-3 самых залайканных
+    const topSuggestions = [...suggestionsWithLikes]
+        .sort((a, b) => b.likeCount - a.likeCount)
+        .slice(0, 3);
+    
+    // Отображаем топ предложений
+    if (topContainer) {
+        let topHtml = '<div class="top-suggestions-title">🔥 ТОП ПРЕДЛОЖЕНИЙ 🔥</div>';
+        topSuggestions.forEach(s => {
+            topHtml += `
+                <div class="top-suggestion-item">
+                    <div class="top-suggestion-author">${s.nick} (${s.school})</div>
+                    <div class="top-suggestion-text">${s.text}</div>
+                    <div class="top-suggestion-likes">👍 ${s.likeCount}</div>
+                </div>
+            `;
+        });
+        if (topSuggestions.length === 0) {
+            topHtml += '<div class="top-suggestion-item">Пока нет предложений</div>';
+        }
+        topContainer.innerHTML = topHtml;
+    }
+    
+    // Отображаем все предложения
     let html = '';
-    userSuggestions.reverse().forEach(s => {
+    suggestions.slice().reverse().forEach(s => {
+        const likes = suggestionLikes[s.id] || { likes: [], dislikes: [] };
+        const userLike = likes.likes.includes(deviceId) ? 'active-like' : '';
+        const userDislike = likes.dislikes.includes(deviceId) ? 'active-dislike' : '';
+        
         html += `
-            <div class="suggestion-item">
+            <div class="suggestion-item" data-suggestion-id="${s.id}">
                 <div class="suggestion-meta">
                     <span class="suggestion-author">${s.nick}</span>
                     <span class="suggestion-school-tag">${s.school}</span>
                     <span>${new Date(s.timestamp).toLocaleString()}</span>
                 </div>
                 <div class="suggestion-content">${s.text}</div>
+                <div class="suggestion-likes">
+                    <button class="like-btn ${userLike}" data-type="suggestion" data-action="like">👍</button>
+                    <span class="like-count">${likes.likes.length}</span>
+                    <button class="dislike-btn ${userDislike}" data-type="suggestion" data-action="dislike">👎</button>
+                    <span class="dislike-count">${likes.dislikes.length}</span>
+                </div>
             </div>
         `;
     });
@@ -555,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Создаём секцию "О проекте"
     createAboutSection();
     
-    // Добавляем кнопку TG канала рядом с TG ботом
+    // Добавляем кнопку TG канала
     const header = document.querySelector('.header');
     if (header) {
         const tgChannelBtn = document.createElement('a');
@@ -567,12 +606,19 @@ document.addEventListener('DOMContentLoaded', function() {
         header.appendChild(tgChannelBtn);
     }
     
-    // Навигация по меню (убраны разделы Рейтинги и Школы)
+    // Обновляем рекламный блок - делаем 4 места
+    const adBlock = document.querySelector('.ad-block');
+    if (adBlock) {
+        adBlock.innerHTML = `
+            <div class="ad-banner">🔞 ПОШЛАЯ РЕКЛАМА 1<br><small>тут мог быть твой притон</small></div>
+            <div class="ad-banner">💀 АДМИНСКАЯ РЕКЛАМА 1<br><small>пиши в тг боте</small></div>
+            <div class="ad-banner">🔞 ПОШЛАЯ РЕКЛАМА 2<br><small>18+ только здесь</small></div>
+            <div class="ad-banner">💀 АДМИНСКАЯ РЕКЛАМА 2<br><small>реклама твоего бизнеса</small></div>
+        `;
+    }
+    
+    // Навигация по меню
     document.querySelectorAll('.nav-item').forEach(item => {
-        if (item.dataset.nav === 'rating' || item.dataset.nav === 'schools') {
-            item.style.display = 'none';
-        }
-        
         item.addEventListener('click', function() {
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active-nav'));
             this.classList.add('active-nav');
@@ -622,7 +668,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Голосование
+    // Голосование за учителей
     document.getElementById('saveVoteBtn')?.addEventListener('click', async function() {
         if (!selectedTeacher) {
             alert('Выбери учителя!');
@@ -690,13 +736,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        suggestions.push({
+        const newSuggestion = {
+            id: Date.now().toString(),
             nick: nick,
             school: school,
             text: text,
             deviceId: deviceId,
             timestamp: Date.now()
-        });
+        };
+        
+        suggestions.push(newSuggestion);
         
         await saveToFirebase();
         renderSuggestions();
@@ -706,40 +755,96 @@ document.addEventListener('DOMContentLoaded', function() {
         if (textInput) textInput.value = '';
     });
 
-    // Обработчики лайков
+    // Обработчики лайков (общий для комментариев и предложений)
     document.addEventListener('click', async function(e) {
         if (e.target.classList.contains('like-btn') || e.target.classList.contains('dislike-btn')) {
             const btn = e.target;
-            const commentItem = btn.closest('.comment-item');
-            const commentId = commentItem?.dataset.commentId;
+            const type = btn.dataset.type; // 'comment' или 'suggestion'
             const action = btn.dataset.action;
+            const parent = btn.closest(type === 'comment' ? '.comment-item' : '.suggestion-item');
             
-            if (!commentId) return;
+            if (!parent) return;
             
-            if (!commentLikes[commentId]) {
-                commentLikes[commentId] = { likes: [], dislikes: [] };
+            const id = parent.dataset.commentId || parent.dataset.suggestionId;
+            if (!id) return;
+            
+            if (type === 'comment') {
+                if (!commentLikes[id]) {
+                    commentLikes[id] = { likes: [], dislikes: [] };
+                }
+                
+                const likes = commentLikes[id];
+                
+                if (action === 'like') {
+                    if (likes.likes.includes(deviceId)) {
+                        likes.likes = likes.likes.filter(id => id !== deviceId);
+                    } else {
+                        likes.likes.push(deviceId);
+                        likes.dislikes = likes.dislikes.filter(id => id !== deviceId);
+                    }
+                } else {
+                    if (likes.dislikes.includes(deviceId)) {
+                        likes.dislikes = likes.dislikes.filter(id => id !== deviceId);
+                    } else {
+                        likes.dislikes.push(deviceId);
+                        likes.likes = likes.likes.filter(id => id !== deviceId);
+                    }
+                }
+                
+                await saveToFirebase();
+                renderComments();
+            } else if (type === 'suggestion') {
+                if (!suggestionLikes[id]) {
+                    suggestionLikes[id] = { likes: [], dislikes: [] };
+                }
+                
+                const likes = suggestionLikes[id];
+                
+                if (action === 'like') {
+                    if (likes.likes.includes(deviceId)) {
+                        likes.likes = likes.likes.filter(id => id !== deviceId);
+                    } else {
+                        likes.likes.push(deviceId);
+                        likes.dislikes = likes.dislikes.filter(id => id !== deviceId);
+                    }
+                } else {
+                    if (likes.dislikes.includes(deviceId)) {
+                        likes.dislikes = likes.dislikes.filter(id => id !== deviceId);
+                    } else {
+                        likes.dislikes.push(deviceId);
+                        likes.likes = likes.likes.filter(id => id !== deviceId);
+                    }
+                }
+                
+                await saveToFirebase();
+                renderSuggestions();
+            }
+        }
+        
+        // Обработчики голосований
+        if (e.target.classList.contains('poll-btn')) {
+            const btn = e.target;
+            const pollItem = btn.closest('.poll-item');
+            const pollId = pollItem.dataset.pollId;
+            const option = btn.dataset.option;
+            const poll = polls.find(p => p.id == pollId);
+            
+            if (!poll) return;
+            
+            for (let opt in poll.votes) {
+                if (poll.votes[opt].includes(deviceId)) {
+                    alert('Ты уже голосовал в этом опросе!');
+                    return;
+                }
             }
             
-            const likes = commentLikes[commentId];
-            
-            if (action === 'like') {
-                if (likes.likes.includes(deviceId)) {
-                    likes.likes = likes.likes.filter(id => id !== deviceId);
-                } else {
-                    likes.likes.push(deviceId);
-                    likes.dislikes = likes.dislikes.filter(id => id !== deviceId);
-                }
-            } else {
-                if (likes.dislikes.includes(deviceId)) {
-                    likes.dislikes = likes.dislikes.filter(id => id !== deviceId);
-                } else {
-                    likes.dislikes.push(deviceId);
-                    likes.likes = likes.likes.filter(id => id !== deviceId);
-                }
+            if (!poll.votes[option]) {
+                poll.votes[option] = [];
             }
             
+            poll.votes[option].push(deviceId);
             await saveToFirebase();
-            renderComments();
+            renderPolls();
         }
     });
 
